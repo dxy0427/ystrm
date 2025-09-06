@@ -6,6 +6,7 @@ from typing import List
 # 关键修改：从 app 包内引用 logger（相对路径 .logger）
 from .logger import logger
 # 若后续引用 config，也需用相对路径：from .config import global_config
+from .config import global_config
 
 class FileProcessor:
     def __init__(self, monitor_conf: dict):
