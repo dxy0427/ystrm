@@ -17,8 +17,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 复制 ystrm 代码（仅app目录）
-COPY app/ ./app/
+COPY ./ ./app/
 
 # 创建 ystrm 日志目录
 RUN mkdir -p /app/logs && chmod 777 /app/logs
