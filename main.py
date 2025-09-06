@@ -5,6 +5,7 @@ from crontab import CronTab
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# 模块引用：从app包导入（main.py在根目录，路径正确）
 from app.logger import logger
 from app.config import global_config
 from app.file_processor import FileProcessor
@@ -65,7 +66,7 @@ class RealTimeHandler(FileSystemEventHandler):
         if self.processor.copy_metadata and file_ext in self.processor.metadata_exts:
             self.processor.copy_metadata(source_file, target_source_dir)
 
-# -------------------------- 主程序类（不变，仅路径引用已改） --------------------------
+# -------------------------- 主程序类（核心修正：定时任务command传字符串） --------------------------
 class YSTRM:
     def __init__(self):
         self.processors = [FileProcessor(conf) for conf in global_config.monitor_confs]
@@ -74,7 +75,7 @@ class YSTRM:
         self.observers = []
 
     def _run_full_task(self):
-        """执行完整定时任务：文件处理 → 同步清理"""
+        """执行完整定时任务：文件处理 → 同步清理（逻辑不变）"""
         logger.info("=" * 60)
         logger.info("【定时任务启动】开始全量处理+同步清理")
         logger.info("=" * 60)
@@ -89,19 +90,34 @@ class YSTRM:
         logger.info("=" * 60)
 
     def _start_cron(self):
-        """启动定时任务（已修复：指定root用户）"""
+        """启动定时任务（核心修正：command传字符串命令，而非函数对象）"""
         if not global_config.cron_enable:
             logger.warning("定时任务未启用，跳过Cron启动")
             return
 
         try:
-            # 关键：指定user='root'，解决系统crontab用户缺失错误
+            # 1. 初始化Cron，指定root用户（解决之前的用户缺失错误）
             cron = CronTab(tab="", user='root')
-            job = cron.new(command=self._run_full_task, comment="YSTRM Full Task")
-            job.setall(global_config.cron_expression)
-            self.cron_job = job
-            logger.info(f"定时任务已加载：Cron表达式 = {global_config.cron_expression}")
 
+            # 2. 构造Shell命令字符串（关键！用python -c执行_run_full_task方法）
+            # 逻辑：导入YSTRM类 → 创建实例 → 调用定时任务方法
+            cron_command = (
+                "python -c 'from main import YSTRM; "
+                "import logging; "  # 确保日志正常输出
+                "logging.basicConfig(level=logging.INFO); "
+                "app = YSTRM(); "
+                "app._run_full_task()'"
+            )
+
+            # 3. 创建Cron任务（传入字符串命令，而非函数）
+            job = cron.new(command=cron_command, comment="YSTRM Full Task")
+            job.setall(global_config.cron_expression)  # 从配置读取Cron表达式
+            self.cron_job = job
+
+            logger.info(f"定时任务已加载：Cron表达式 = {global_config.cron_expression}")
+            logger.debug(f"定时任务执行命令：{cron_command}")
+
+            # 4. 循环检查Cron任务（每秒一次）
             while True:
                 cron.run_pending()
                 time.sleep(1)
@@ -110,7 +126,7 @@ class YSTRM:
             raise
 
     def _start_real_time_monitor(self):
-        """启动实时监控（开关由real_time_monitor控制）"""
+        """启动实时监控（开关可控，逻辑不变）"""
         if not global_config.real_time_monitor:
             logger.info("实时监控已禁用（real_time_monitor: False），不启动")
             return
@@ -139,7 +155,7 @@ class YSTRM:
         logger.info("=" * 60)
 
     def start(self):
-        """启动主程序（定时任务+实时监控）"""
+        """启动主程序（逻辑不变）"""
         logger.info("=" * 60)
         logger.info("YSTRM 服务启动中...")
         logger.info("=" * 60)
@@ -161,7 +177,7 @@ class YSTRM:
                     if not observer.is_alive():
                         logger.error("实时监控线程异常退出，尝试重启...")
                         observer.start()
-                time.sleep(3600)
+                time.sleep(3600)  # 每小时检查一次
         except KeyboardInterrupt:
             logger.info("收到停止信号，服务正在关闭...")
             # 停止实时监控线程
