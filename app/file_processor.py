@@ -3,7 +3,6 @@ import shutil
 from pathlib import Path
 from typing import List
 
-# 关键修改：从 app 包内引用 logger（相对路径 .logger）
 from .logger import logger
 from .config import global_config
 
@@ -15,7 +14,9 @@ class FileProcessor:
         self.video_exts = monitor_conf["video_extensions"]
         self.metadata_exts = monitor_conf["metadata_extensions"]
         self.create_strm = monitor_conf.get("create_strm", True)
-        self.copy_metadata = monitor_conf.get("copy_metadata", True)
+        
+        # 1. 关键修改：变量名从 copy_metadata 改为 enable_copy_metadata（避免与方法名冲突）
+        self.enable_copy_metadata = monitor_conf.get("copy_metadata", True)
 
     def _normalize_dir(self, dir_path: str) -> str:
         return os.path.abspath(dir_path) + "/"
@@ -53,6 +54,7 @@ class FileProcessor:
         except Exception as e:
             logger.error(f"STRM生成失败：{dest_strm} - {str(e)}", exc_info=True)
 
+    # 2. 方法名保持 copy_metadata（不变，负责执行复制逻辑）
     def copy_metadata(self, source_metadata: str, base_source_dir: str):
         rel_path = self._get_relative_path(source_metadata, base_source_dir)
         dest_metadata = os.path.join(self.dest_dir, rel_path)
@@ -83,8 +85,9 @@ class FileProcessor:
 
                 if self.create_strm and file_ext in self.video_exts:
                     self.generate_strm(source_file, source_dir)
-                if self.copy_metadata and file_ext in self.metadata_exts:
-                    self.copy_metadata(source_file, source_dir)
+                # 3. 关键修改：判断时用新变量名 enable_copy_metadata（而非 copy_metadata）
+                if self.enable_copy_metadata and file_ext in self.metadata_exts:
+                    self.copy_metadata(source_file, source_dir)  # 现在调用的是方法，不是布尔值
 
         logger.info(f"源目录处理完成：{source_dir}")
 
