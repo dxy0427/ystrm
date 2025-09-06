@@ -3,16 +3,14 @@ from logging.handlers import RotatingFileHandler
 import os
 
 def init_logger():
-    """初始化日志：控制台+文件输出，按大小切割"""
     log_dir = "/app/logs"
     os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, "library_strm.log")
+    log_file = os.path.join(log_dir, "ystrm.log")  # 日志文件名改为ystrm，语义一致
 
-    logger = logging.getLogger("LibrarySTRM")
+    logger = logging.getLogger("YSTRM")
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
-    # 日志格式
     formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s"
     )
@@ -22,7 +20,7 @@ def init_logger():
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # 文件输出（最大100MB，保留5个备份）
+    # 文件输出（按大小切割）
     file_handler = RotatingFileHandler(
         log_file, maxBytes=100 * 1024 * 1024, backupCount=5, encoding="utf-8"
     )
