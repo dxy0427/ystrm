@@ -1,7 +1,6 @@
 import os
 import shutil
 import time
-from pathlib import Path
 from typing import List
 
 from .logger import logger
@@ -18,16 +17,13 @@ class FileProcessor:
         self.enable_copy_metadata = monitor_conf.get("copy_metadata", True)
 
     def _normalize_dir(self, dir_path: str) -> str:
-        # 确保路径以斜杠结尾，以便进行路径操作
         return os.path.abspath(dir_path).rstrip('/') + '/'
 
     def _normalize_dirs(self, dirs: List[str]) -> List[str]:
         return [self._normalize_dir(d) for d in dirs]
 
+    # 【关键修正】始终使用 os.path.relpath，这是最安全、最标准的方法
     def _get_relative_path(self, file_path: str, base_dir: str) -> str:
-        # 确保 base_dir 是 file_path 的前缀
-        if file_path.startswith(base_dir):
-            return file_path[len(base_dir):]
         return os.path.relpath(file_path, base_dir)
 
     def _should_process(self, dest_file: str, source_mtime: float) -> bool:
@@ -38,9 +34,12 @@ class FileProcessor:
         return source_mtime > os.path.getmtime(dest_file)
 
     def generate_strm(self, source_video: str, base_source_dir: str):
-        # 【关键修正】使用 library_dir 作为计算相对路径的基准
         rel_path = self._get_relative_path(source_video, self.library_dir)
-        dest_strm = os.path.join(self.dest_dir, rel_path).replace(os.path.splitext(rel_path)[1], ".strm")
+        
+        # 【关键修正】使用更稳健的方法来替换后缀，避免潜在的bug
+        dest_path_base = os.path.join(self.dest_dir, rel_path)
+        dest_strm = os.path.splitext(dest_path_base)[0] + ".strm"
+        
         dest_strm_dir = os.path.dirname(dest_strm)
 
         source_mtime = os.path.getmtime(source_video)
@@ -50,6 +49,7 @@ class FileProcessor:
 
         os.makedirs(dest_strm_dir, exist_ok=True)
         try:
+            # strm文件内容里的路径依然是源文件的完整路径
             strm_content = os.path.join(self.library_dir, rel_path)
             with open(dest_strm, "w", encoding="utf-8") as f:
                 f.write(strm_content)
@@ -59,7 +59,6 @@ class FileProcessor:
             logger.error(f"STRM生成失败：{dest_strm} - {str(e)}", exc_info=True)
 
     def copy_metadata(self, source_metadata: str, base_source_dir: str):
-        # 【关键修正】使用 library_dir 作为计算相对路径的基准
         rel_path = self._get_relative_path(source_metadata, self.library_dir)
         dest_metadata = os.path.join(self.dest_dir, rel_path)
         dest_metadata_dir = os.path.dirname(dest_metadata)
@@ -89,7 +88,6 @@ class FileProcessor:
                 source_file = os.path.join(root, file)
                 file_ext = os.path.splitext(file)[1].lower()
 
-                # 这里的 base_source_dir 参数虽然还在，但已在内部方法中被 self.library_dir 替代
                 if self.create_strm and file_ext in self.video_exts:
                     self.generate_strm(source_file, source_dir)
                 if self.enable_copy_metadata and file_ext in self.metadata_exts:
