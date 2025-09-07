@@ -1,19 +1,10 @@
-# ===================================================
-#                YSTRM 核心配置文件
-#
-# 注意: 所有路径均为容器内路径，需与 docker -v 挂载对应
-# ===================================================
-
 sync:
-  # --- 1. 核心开关 ---
-
   # 启动时，是否先执行一次全量任务？ (true/false)
   run_full_task_on_startup: True
 
   # 是否启用实时监控？ (true=文件变更时立即处理, false=仅靠定时任务)
   real_time_monitor: True
 
-  # --- 2. 定时任务配置 ---
   cron_full_process:
     # 是否启用定时任务？ (true/false)
     enable: True
@@ -24,7 +15,7 @@ sync:
 
     # 文件处理速率限制 (个/秒)，0为不限制。
     # 用于大量文件时降低磁盘负载。(例: 1=每秒1个, 2=每秒2个)
-    files_per_second_limit: 0
+    files_per_second_limit: 1
 
     # 定时任务是否扫描所有文件以确保完整性？ (true/false)
     full_generate: True
@@ -38,17 +29,16 @@ sync:
     # 是否自动清理目标目录中的空文件夹？ (true/false)
     cleanup_empty_dirs: True
 
-  # --- 3. 监控目录配置 (可添加多个) ---
   monitor_confs:
     - 
       # 源目录列表 (视频/媒体文件所在位置)
-      source_dir: ["/mnt/strm"]
+      source_dir: ["/mnt/media","/mnt/media2"]
 
       # 目标输出目录 (生成的.strm和元数据放这里)
-      dest_dir: "/mnt/media/"
+      dest_dir: "/mnt/strm"
 
       # .strm文件内指向的真实路径 (需与Emby/Plex等播放器访问路径一致)
-      library_dir: "/mnt/strm"
+      library_dir: "/mnt/media"
 
       # 是否生成.strm文件？ (true/false)
       create_strm: True
