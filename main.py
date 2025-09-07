@@ -5,13 +5,13 @@ from crontab import CronTab
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# 模块引用：从app包导入（main.py在根目录，路径正确）
+# 模块引用：从app包导入核心组件（路径正确，因main.py在根目录）
 from app.logger import logger
 from app.config import global_config
 from app.file_processor import FileProcessor
 from app.sync_cleaner import SyncCleaner
 
-# -------------------------- 实时监控事件处理器（不变） --------------------------
+# -------------------------- 实时监控事件处理器（功能不变） --------------------------
 class RealTimeHandler(FileSystemEventHandler):
     def __init__(self, processor: FileProcessor, cleaner: SyncCleaner):
         self.processor = processor
@@ -63,10 +63,10 @@ class RealTimeHandler(FileSystemEventHandler):
             return
         if self.processor.create_strm and file_ext in self.processor.video_exts:
             self.processor.generate_strm(source_file, target_source_dir)
-        if self.processor.copy_metadata and file_ext in self.processor.metadata_exts:
+        if self.processor.enable_copy_metadata and file_ext in self.processor.metadata_exts:
             self.processor.copy_metadata(source_file, target_source_dir)
 
-# -------------------------- 主程序类（核心修正：定时任务command传字符串） --------------------------
+# -------------------------- 主程序类（核心修正：定时任务逻辑） --------------------------
 class YSTRM:
     def __init__(self):
         self.processors = [FileProcessor(conf) for conf in global_config.monitor_confs]
@@ -75,7 +75,7 @@ class YSTRM:
         self.observers = []
 
     def _run_full_task(self):
-        """执行完整定时任务：文件处理 → 同步清理（逻辑不变）"""
+        """执行完整定时任务：文件处理 → 同步清理（功能不变）"""
         logger.info("=" * 60)
         logger.info("【定时任务启动】开始全量处理+同步清理")
         logger.info("=" * 60)
@@ -90,43 +90,67 @@ class YSTRM:
         logger.info("=" * 60)
 
     def _start_cron(self):
-        """启动定时任务（核心修正：command传字符串命令，而非函数对象）"""
+        """启动定时任务（核心修正：系统Cron表持久化+环境变量适配+调试日志）"""
         if not global_config.cron_enable:
             logger.warning("定时任务未启用，跳过Cron启动")
             return
 
         try:
-            # 1. 初始化Cron，指定root用户（解决之前的用户缺失错误）
-            cron = CronTab(tab="", user='root')
+            # 修正1：读取root用户的系统Cron表（而非内存临时表），支持任务持久化
+            cron = CronTab(user='root')
 
-            # 2. 构造Shell命令字符串（关键！用python -c执行_run_full_task方法）
-            # 逻辑：导入YSTRM类 → 创建实例 → 调用定时任务方法
+            # 修正2：先删除同名任务，避免多次启动导致Cron表堆积重复任务
+            existing_jobs = cron.find_comment("YSTRM Full Task")
+            for job in existing_jobs:
+                cron.remove(job)
+                logger.debug("已删除旧的定时任务（避免重复）")
+            cron.write()  # 保存删除操作
+
+            # 修正3：构造Cron命令，指定PYTHONPATH确保能找到main模块（容器环境适配）
             cron_command = (
-                "python -c 'from main import YSTRM; "
-                "import logging; "  # 确保日志正常输出
-                "logging.basicConfig(level=logging.INFO); "
+                "/usr/local/bin/python -c 'import sys; "
+                "sys.path.append(\"/app\"); "  # 关键：添加项目根目录到Python路径
+                "from main import YSTRM; "
                 "app = YSTRM(); "
                 "app._run_full_task()'"
             )
 
-            # 3. 创建Cron任务（传入字符串命令，而非函数）
+            # 创建新的Cron任务
             job = cron.new(command=cron_command, comment="YSTRM Full Task")
-            job.setall(global_config.cron_expression)  # 从配置读取Cron表达式
+            job.setall(global_config.cron_expression)  # 应用配置的Cron表达式
             self.cron_job = job
 
-            logger.info(f"定时任务已加载：Cron表达式 = {global_config.cron_expression}")
-            logger.debug(f"定时任务执行命令：{cron_command}")
+            # 修正4：将任务持久化到系统Cron表（之前漏了这步，任务未保存）
+            cron.write()
 
-            # 4. 循环检查Cron任务（每秒一次）
+            # 日志输出任务详情，便于排查
+            logger.info("=" * 50)
+            logger.info("定时任务已成功添加到系统Cron表：")
+            logger.info(f"  执行用户：root")
+            logger.info(f"  Cron表达式：{global_config.cron_expression}")
+            logger.info(f"  执行命令：{cron_command}")
+            logger.info("=" * 50)
+
+            # 修正5：添加调度循环调试日志，确认线程在正常运行
+            logger.info("定时任务调度线程已启动，持续监控任务触发...")
             while True:
-                cron.run_pending()
-                time.sleep(1)
+                cron.run_pending()  # 检查是否有任务需要执行
+                logger.debug("Cron任务检查完成，10秒后再次检查（调试日志）")
+                time.sleep(10)  # 延长间隔，减少资源占用
+
         except Exception as e:
             logger.error(f"定时任务启动失败：{str(e)}", exc_info=True)
+            # 异常时清理残留任务，避免Cron表堆积
+            try:
+                cron.remove_all(comment="YSTRM Full Task")
+                cron.write()
+                logger.warning("异常退出，已清理残留的Cron任务")
+            except Exception as cleanup_e:
+                logger.error(f"清理残留Cron任务失败：{str(cleanup_e)}", exc_info=True)
             raise
 
     def _start_real_time_monitor(self):
-        """启动实时监控（开关可控，逻辑不变）"""
+        """启动实时监控（功能不变，开关可控）"""
         if not global_config.real_time_monitor:
             logger.info("实时监控已禁用（real_time_monitor: False），不启动")
             return
@@ -155,12 +179,12 @@ class YSTRM:
         logger.info("=" * 60)
 
     def start(self):
-        """启动主程序（逻辑不变）"""
+        """启动主程序（主线程逻辑不变）"""
         logger.info("=" * 60)
         logger.info("YSTRM 服务启动中...")
         logger.info("=" * 60)
 
-        # 启动定时任务线程
+        # 启动定时任务线程（修正后的逻辑）
         cron_thread = Thread(target=self._start_cron, daemon=True)
         cron_thread.start()
         logger.info("定时任务线程已启动")
@@ -169,21 +193,34 @@ class YSTRM:
         rt_thread = Thread(target=self._start_real_time_monitor, daemon=True)
         rt_thread.start()
 
-        # 主线程保持运行
+        # 主线程保持运行，监控子线程状态
         try:
             while True:
+                # 检查定时任务线程状态（异常重启）
+                if not cron_thread.is_alive():
+                    logger.error("定时任务线程异常退出，尝试重启...")
+                    cron_thread = Thread(target=self._start_cron, daemon=True)
+                    cron_thread.start()
                 # 检查实时监控线程状态（异常重启）
-                for observer in self.observers:
+                for idx, observer in enumerate(self.observers):
                     if not observer.is_alive():
-                        logger.error("实时监控线程异常退出，尝试重启...")
+                        logger.error(f"实时监控线程[{idx}]异常退出，尝试重启...")
                         observer.start()
-                time.sleep(3600)  # 每小时检查一次
+                time.sleep(3600)  # 每小时检查一次子线程状态
         except KeyboardInterrupt:
             logger.info("收到停止信号，服务正在关闭...")
             # 停止实时监控线程
             for observer in self.observers:
                 observer.stop()
                 observer.join()
+            # 停止定时任务时清理Cron任务
+            try:
+                cron = CronTab(user='root')
+                cron.remove_all(comment="YSTRM Full Task")
+                cron.write()
+                logger.info("已清理系统Cron表中的定时任务")
+            except Exception as e:
+                logger.error(f"清理Cron任务失败：{str(e)}", exc_info=True)
             logger.info("所有实时监控线程已停止")
         finally:
             logger.info("YSTRM 服务已关闭")
@@ -194,4 +231,12 @@ if __name__ == "__main__":
         app.start()
     except Exception as e:
         logger.critical(f"服务启动失败：{str(e)}", exc_info=True)
+        # 启动失败时清理Cron残留任务
+        try:
+            cron = CronTab(user='root')
+            cron.remove_all(comment="YSTRM Full Task")
+            cron.write()
+            logger.warning("服务启动失败，已清理残留Cron任务")
+        except:
+            pass
         exit(1)
