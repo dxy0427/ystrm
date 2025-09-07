@@ -1,5 +1,6 @@
 Docker 部署
-  docker run -d \
+
+'''docker run -d \
   --name ystrm \
   --restart unless-stopped \
   -v /mnt/media:/mnt/media:rslave \
@@ -7,4 +8,4 @@ Docker 部署
   -v /home/docker/ystrm/config.yaml:/app/config.yaml \
   -v /home/docker/ystrm/logs:/app/logs \
   -e TZ=Asia/Shanghai \
-  ghcr.io/dxy0427/ystrm:latest
+  ghcr.io/dxy0427/ystrm:latest'''
