@@ -21,7 +21,9 @@ class Config:
             raise
 
     def _validate_config(self):
+        # 关键修改：在验证列表中加入新开关
         required = [
+            ("run_full_task_on_startup", bool), # 新增
             ("real_time_monitor", bool),
             ("cron_full_process.enable", bool),
             ("cron_full_process.cron_expression", str),
@@ -45,7 +47,11 @@ class Config:
                 logger.error(f"监控配置[{idx}]缺失核心路径（source_dir/dest_dir/library_dir）")
                 raise KeyError(f"monitor_confs[{idx}] 核心路径缺失")
 
-    # 配置项快捷访问（不变）
+    # 关键修改：添加新开关的快捷访问方法
+    @property
+    def run_full_task_on_startup(self) -> bool:
+        return self.config.get("run_full_task_on_startup", True)
+
     @property
     def real_time_monitor(self) -> bool:
         return self.config.get("real_time_monitor", False)
