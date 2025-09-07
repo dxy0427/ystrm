@@ -1,7 +1,8 @@
 import time
 import os
-import shutil  # 关键新增：用于移动和删除目录树
+import shutil
 from threading import Thread
+from typing import Optional  # 关键修正：导入 Optional
 from crontab import CronTab
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
