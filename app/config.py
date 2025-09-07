@@ -19,7 +19,13 @@ class Config:
             raise
 
     def _validate_config(self):
-        required = [("run_full_task_on_startup", bool), ("real_time_monitor", bool), ("cron_full_process.enable", bool), ("cron_full_process.cron_expression", str), ("monitor_confs", list)]
+        required = [
+            ("run_full_task_on_startup", bool),
+            ("real_time_monitor", bool),
+            ("cron_full_process.enable", bool),
+            ("cron_full_process.cron_expression", str),
+            ("monitor_confs", list)
+        ]
         for key, typ in required:
             keys, value = key.split("."), self.config
             try:
@@ -46,7 +52,7 @@ class Config:
         try:
             rate = int(self.config["cron_full_process"].get("files_per_second_limit", 0))
             return 1.0 / rate if rate > 0 else 0.0
-        except: return 0.0
+        except (ValueError, TypeError): return 0.0
     @property
     def full_generate(self) -> bool: return self.config["cron_full_process"].get("full_generate", True)
     @property
