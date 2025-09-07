@@ -1,5 +1,3 @@
-# /app/cron_task.py
-
 import sys
 
 # 确保能找到 /app 目录下的模块
