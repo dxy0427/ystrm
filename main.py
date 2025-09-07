@@ -111,7 +111,8 @@ class YSTRM:
             cron = CronTab(user='root')
             cron.remove_all(comment="YSTRM Full Task")
 
-            cron_command = f"/usr/local/bin/python /app/cron_task.py >> /app/logs/cron.log 2>&1"
+            # 关键修正：将 cron 任务的输出重定向到主进程的标准输出
+            cron_command = f"/usr/local/bin/python /app/cron_task.py >> /proc/1/fd/1 2>&1"
             
             job = cron.new(command=cron_command, comment="YSTRM Full Task")
             job.setall(global_config.cron_expression)
