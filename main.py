@@ -111,9 +111,7 @@ class YSTRM:
             cron = CronTab(user='root')
             cron.remove_all(comment="YSTRM Full Task")
 
-            # 关键修正：将 cron 命令的输出和错误重定向到日志文件
-            python_command = "/usr/local/bin/python -c 'import sys; sys.path.append(\"/app\"); from main import YSTRM; app = YSTRM(); app._run_full_task()'"
-            cron_command = f"{python_command} >> /app/logs/cron.log 2>&1"
+            cron_command = f"/usr/local/bin/python /app/cron_task.py >> /app/logs/cron.log 2>&1"
             
             job = cron.new(command=cron_command, comment="YSTRM Full Task")
             job.setall(global_config.cron_expression)
@@ -178,14 +176,12 @@ if __name__ == "__main__":
     try:
         app = YSTRM()
         
-        # 根据新开关决定是否执行首次全量任务
         if global_config.run_full_task_on_startup:
             logger.info("检测到 'run_full_task_on_startup: True'，服务启动时执行一次全量任务...")
             app._run_full_task()
         else:
             logger.info("检测到 'run_full_task_on_startup: False'，跳过启动时的全量任务。")
 
-        # 启动长期服务
         app.start()
         
     except Exception as e:
