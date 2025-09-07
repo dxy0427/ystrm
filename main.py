@@ -110,7 +110,11 @@ class YSTRM:
         try:
             cron = CronTab(user='root')
             cron.remove_all(comment="YSTRM Full Task")
-            cron_command = ( "/usr/local/bin/python -c 'import sys; sys.path.append(\"/app\"); from main import YSTRM; app = YSTRM(); app._run_full_task()'" )
+
+            # 关键修正：将 cron 命令的输出和错误重定向到日志文件
+            python_command = "/usr/local/bin/python -c 'import sys; sys.path.append(\"/app\"); from main import YSTRM; app = YSTRM(); app._run_full_task()'"
+            cron_command = f"{python_command} >> /app/logs/cron.log 2>&1"
+            
             job = cron.new(command=cron_command, comment="YSTRM Full Task")
             job.setall(global_config.cron_expression)
             cron.write()
