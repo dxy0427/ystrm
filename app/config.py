@@ -2,7 +2,6 @@ import yaml
 import os
 from typing import List, Dict, Optional
 
-# 关键修改：从 app 包内引用 logger（用相对路径 .logger）
 from .logger import logger
 
 class Config:
@@ -21,9 +20,8 @@ class Config:
             raise
 
     def _validate_config(self):
-        # 关键修改：在验证列表中加入新开关
         required = [
-            ("run_full_task_on_startup", bool), # 新增
+            ("run_full_task_on_startup", bool),
             ("real_time_monitor", bool),
             ("cron_full_process.enable", bool),
             ("cron_full_process.cron_expression", str),
@@ -47,7 +45,6 @@ class Config:
                 logger.error(f"监控配置[{idx}]缺失核心路径（source_dir/dest_dir/library_dir）")
                 raise KeyError(f"monitor_confs[{idx}] 核心路径缺失")
 
-    # 关键修改：添加新开关的快捷访问方法
     @property
     def run_full_task_on_startup(self) -> bool:
         return self.config.get("run_full_task_on_startup", True)
@@ -63,6 +60,26 @@ class Config:
     @property
     def cron_expression(self) -> str:
         return self.config["cron_full_process"]["cron_expression"]
+
+    # 【关键修改】实现速率转换逻辑
+    @property
+    def file_processing_interval(self) -> float:
+        try:
+            # 读取新的配置项，默认为 0
+            rate_limit = self.config["cron_full_process"].get("files_per_second_limit", 0)
+            rate_limit = int(rate_limit)
+
+            # 如果限制为 0 或负数，则不等待
+            if rate_limit <= 0:
+                return 0.0
+            
+            # 否则，计算每个文件处理后需要等待的秒数
+            # 例如：rate_limit=2 (每秒2个)，则返回 1.0 / 2 = 0.5 秒
+            return 1.0 / rate_limit
+
+        except (ValueError, TypeError):
+            # 如果配置值不是数字，则默认为不等待
+            return 0.0
 
     @property
     def full_generate(self) -> bool:
@@ -84,5 +101,4 @@ class Config:
     def monitor_confs(self) -> List[Dict]:
         return self.config["monitor_confs"]
 
-# 全局配置对象（不变）
 global_config = Config()
