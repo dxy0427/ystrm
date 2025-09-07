@@ -14,16 +14,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 1. 复制依赖文件（先复制requirements.txt，利用Docker缓存）
+# 复制依赖文件（先复制requirements.txt，利用Docker缓存）
 COPY requirements.txt .
 # 安装Python依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 复制应用代码
 COPY main.py .
 COPY app/ ./app/
 
 # 创建日志目录（权限777，避免写入失败）
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
-# 启动命令
-CMD ["python", "/app/main.py"]
+# 关键修正：启动命令
+# 使用 sh -c 来确保 cron 服务在后台启动，然后 python 应用在前台运行以保持容器活动
+CMD ["sh", "-c", "cron && python /app/main.py"]
