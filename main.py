@@ -12,8 +12,6 @@ from app.config import global_config
 from app.file_processor import FileProcessor
 from app.sync_cleaner import SyncCleaner
 
-# RealTimeHandler 类和 YSTRM 类的前半部分都保持不变
-# ... (省略未修改的代码) ...
 class RealTimeHandler(FileSystemEventHandler):
     def __init__(self, processor: FileProcessor, cleaner: SyncCleaner):
         self.processor = processor
@@ -28,6 +26,7 @@ class RealTimeHandler(FileSystemEventHandler):
                     return os.path.splitext(dest_path)[0] + ".strm"
                 return dest_path
         return None
+
     def on_created(self, event):
         if event.is_directory:
             dest_dir = self._get_dest_path(event.src_path)
@@ -36,9 +35,11 @@ class RealTimeHandler(FileSystemEventHandler):
                 logger.info(f"实时同步创建目录：{dest_dir}")
         else:
             self._process_file(event.src_path, "创建")
+
     def on_modified(self, event):
         if not event.is_directory:
             self._process_file(event.src_path, "修改")
+
     def on_deleted(self, event):
         dest_path = self._get_dest_path(event.src_path)
         if not dest_path or not os.path.exists(dest_path): return
@@ -52,6 +53,7 @@ class RealTimeHandler(FileSystemEventHandler):
             self.cleaner.cleanup_empty_dirs()
         except Exception as e:
             logger.error(f"实时删除失败：{dest_path} - {str(e)}", exc_info=True)
+
     def on_moved(self, event):
         old_dest_path = self._get_dest_path(event.src_path)
         new_dest_path = self._get_dest_path(event.dest_path)
@@ -66,6 +68,7 @@ class RealTimeHandler(FileSystemEventHandler):
                 self._process_file(event.dest_path, "移入")
         except Exception as e:
             logger.error(f"实时移动/重命名失败 - {str(e)}", exc_info=True)
+
     def _process_file(self, source_file: str, event_type: str):
         file_ext = os.path.splitext(source_file)[1].lower()
         target_source_dir = None
@@ -81,11 +84,13 @@ class RealTimeHandler(FileSystemEventHandler):
             self.processor.generate_strm(source_file, target_source_dir)
         if self.processor.enable_copy_metadata and file_ext in self.processor.metadata_exts:
             self.processor.copy_metadata(source_file, target_source_dir)
+
 class YSTRM:
     def __init__(self):
         self.processors = [FileProcessor(conf) for conf in global_config.monitor_confs]
         self.cleaners = [SyncCleaner(conf) for conf in global_config.monitor_confs]
         self.observers = []
+
     def _run_full_task(self):
         logger.info("=" * 60)
         logger.info("【任务触发】开始全量处理+同步清理")
@@ -97,6 +102,7 @@ class YSTRM:
         logger.info("=" * 60)
         logger.info("【任务结束】全量处理+同步清理完成")
         logger.info("=" * 60)
+
     def _setup_cron_job(self):
         if not global_config.cron_enable:
             logger.warning("定时任务未启用，跳过Cron设置")
@@ -116,6 +122,7 @@ class YSTRM:
         except Exception as e:
             logger.error(f"设置定时任务失败：{str(e)}", exc_info=True)
             raise
+
     def _start_real_time_monitor(self):
         if not global_config.real_time_monitor:
             logger.info("实时监控已禁用，不启动")
@@ -137,6 +144,7 @@ class YSTRM:
                 logger.info(f"  - 监控[{idx}]线程已启动")
         logger.info("【实时监控就绪】所有监听线程启动完成")
         logger.info("=" * 60)
+
     def start(self):
         logger.info("=" * 60)
         logger.info("YSTRM 服务启动中...")
@@ -162,7 +170,6 @@ class YSTRM:
                 logger.error(f"清理Cron任务失败：{str(e)}", exc_info=True)
             logger.info("YSTRM 服务已关闭")
 
-# 关键修改：应用新开关
 if __name__ == "__main__":
     try:
         app = YSTRM()
