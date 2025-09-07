@@ -1,5 +1,3 @@
-# ystrm
-
 Docker 部署
   docker run -d \
   --name ystrm \
