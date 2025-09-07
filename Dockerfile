@@ -21,11 +21,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用代码
 COPY main.py .
+COPY cron_task.py .
 COPY app/ ./app/
 
 # 创建日志目录（权限777，避免写入失败）
 RUN mkdir -p /app/logs && chmod 777 /app/logs
 
-# 关键修正：启动命令
-# 使用 sh -c 来确保 cron 服务在后台启动，然后 python 应用在前台运行以保持容器活动
+# 启动命令
 CMD ["sh", "-c", "cron && python /app/main.py"]
