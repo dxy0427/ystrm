@@ -1,11 +1,13 @@
+# /app/cron_task.py
+
 import sys
 
-# 确保能找到 app 模块
+# 确保能找到 /app 目录下的模块
 sys.path.append("/app")
 
 try:
-    # 这里的导入会触发 config.py 和 logger.py 的初始化
-    from app.main import YSTRM
+    # 关键修正：直接从 'main' 模块导入，因为它和本文件在同一目录下
+    from main import YSTRM
     from app.logger import logger
 
     logger.info("Cron task started by system cron daemon.")
