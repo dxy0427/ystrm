@@ -65,6 +65,11 @@ class Config:
     def preserve_extra_metadata(self) -> bool: return self.config["cron_full_process"].get("preserve_extra_metadata", True)
     @property
     def sync_metadata_to_source(self) -> bool: return self.config["cron_full_process"].get("sync_metadata_to_source", False)
+    
+    # 【新增】读取安全锁开关
+    @property
+    def stop_on_mount_loss(self) -> bool: return self.config["cron_full_process"].get("stop_on_mount_loss", True)
+    
     @property
     def monitor_confs(self) -> List[Dict]: return self.config["monitor_confs"]
 
