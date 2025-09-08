@@ -4,6 +4,7 @@ import time
 from typing import List
 from .logger import logger
 from .config import global_config
+import errno
 
 class FileProcessor:
     def __init__(self, monitor_conf: dict):
@@ -19,11 +20,9 @@ class FileProcessor:
     def _normalize_dirs(self, dirs: List[str]) -> List[str]: return [self._normalize_dir(d) for d in dirs]
     def _get_relative_path(self, file_path: str, base_dir: str) -> str: return os.path.relpath(file_path, base_dir)
 
-    # 【关键修正】分离 strm 和 metadata 的判断逻辑
     def _should_process_metadata(self, source_file: str, dest_file: str) -> bool:
         if not os.path.exists(dest_file): return True
         if global_config.overwrite_existing: return True
-        # 元数据文件，比较修改时间和文件大小
         return (os.path.getmtime(source_file) > os.path.getmtime(dest_file) or
                 os.path.getsize(source_file) != os.path.getsize(dest_file))
 
@@ -31,7 +30,6 @@ class FileProcessor:
         rel_path = self._get_relative_path(source_video, base_dir)
         dest_strm = os.path.splitext(os.path.join(self.dest_dir, rel_path))[0] + ".strm"
         
-        # 【关键修正】对于 .strm 文件，逻辑极其简单：不存在就创建
         if os.path.exists(dest_strm) and not global_config.overwrite_existing:
             logger.debug(f"STRM已存在，跳过创建：{dest_strm}")
             return
@@ -53,7 +51,6 @@ class FileProcessor:
         rel_path = self._get_relative_path(source_metadata, base_dir)
         dest_metadata = os.path.join(self.dest_dir, rel_path)
         
-        # 使用专门为元数据设计的比对方法
         if not self._should_process_metadata(source_metadata, dest_metadata):
             logger.debug(f"元数据已存在且未更新，跳过：{dest_metadata}")
             return
@@ -75,19 +72,55 @@ class FileProcessor:
         logger.info(f"开始处理源目录：{source_dir}")
         interval = global_config.file_processing_interval
         
-        for root, _, files in os.walk(source_dir):
-            for file in files:
+        # 将 os.walk 转换为列表，以便我们可以重试
+        try:
+            all_files = list(os.walk(source_dir))
+        except OSError as e:
+            if e.errno == errno.ENOTCONN: # 107
+                logger.critical(f"开始扫描目录时即发现挂载丢失: {source_dir}。中止对此目录的处理。")
+                return
+            else:
+                raise
+
+        i = 0
+        while i < len(all_files):
+            root, _, files = all_files[i]
+            j = 0
+            while j < len(files):
+                file = files[j]
                 source_file = os.path.join(root, file)
-                file_ext = os.path.splitext(file)[1].lower()
                 
-                if self.create_strm and file_ext in self.video_exts:
-                    self.generate_strm(source_file, self.library_dir)
-                if self.enable_copy_metadata and file_ext in self.metadata_exts:
-                    self.copy_metadata(source_file, self.library_dir)
-                    
-                if interval > 0:
-                    time.sleep(interval)
-                    
+                # 【关键修正】将单个文件处理操作包裹在 "暂停与重试" 循环中
+                while True:
+                    try:
+                        file_ext = os.path.splitext(file)[1].lower()
+                        
+                        if self.create_strm and file_ext in self.video_exts:
+                            self.generate_strm(source_file, self.library_dir)
+                        if self.enable_copy_metadata and file_ext in self.metadata_exts:
+                            self.copy_metadata(source_file, self.library_dir)
+                            
+                        if interval > 0:
+                            time.sleep(interval)
+
+                        # 如果成功，跳出重试循环
+                        break 
+                        
+                    except OSError as e:
+                        if e.errno == errno.ENOTCONN: # ENOTCONN (107) 是 'Transport endpoint is not connected'
+                            logger.warning(f"检测到挂载连接丢失，正在暂停处理... 将在30秒后重试。出错文件: {source_file}")
+                            time.sleep(30)
+                            # 循环将继续，重试当前文件
+                        else:
+                            logger.error(f"处理文件时发生未知的操作系统错误: {source_file} - {str(e)}")
+                            break # 对于其他OS错误，我们跳过这个文件
+                    except Exception as e:
+                        logger.error(f"处理文件时发生未知错误: {source_file} - {str(e)}", exc_info=True)
+                        break # 跳过这个文件
+                
+                j += 1 # 处理下一个文件
+            i += 1 # 处理下一个目录
+            
         logger.info(f"源目录处理完成：{source_dir}")
 
     def process_all_source_dirs(self):
