@@ -1,53 +1,66 @@
 sync:
+  # 用于主动监测挂载盘是否掉线。
+  # 推荐300 (5分钟)。设为 0 可禁用此功能。
+  health_check_interval_seconds: 300
+
   # 启动时，是否先执行一次全量任务？ (true/false)
   run_full_task_on_startup: true
 
   # 是否启用实时监控？ (true=文件变更时立即处理, false=仅靠定时任务)
   real_time_monitor: true
 
+  # --- 2. 定时任务配置 ---
   cron_full_process:
     # 是否启用定时任务？ (true/false)
-    enable: True
+    enable: false
 
     # 定时执行时间 (Cron格式: 分 时 日 月 周)
-    # 示例: "0 3 * * *" -> 每天凌晨3点
-    cron_expression: "0 3 * * *"
+    # 示例: "0 4 * * *" -> 每天凌晨4点
+    cron_expression: "0 4 * * *"
 
     # 文件处理速率限制 (个/秒)，0为不限制。
     # 用于大量文件时降低磁盘负载。(例: 1=每秒1个, 2=每秒2个)
-    files_per_second_limit: 1
+    files_per_second_limit: 0
 
     # 定时任务是否扫描所有文件以确保完整性？ (true/false)
     full_generate: true
 
     # 是否覆盖已存在的目标文件？ (false=仅源文件更新时覆盖, true=总是覆盖)
-    overwrite_existing: talse
+    overwrite_existing: false
 
     # 源文件删除后，是否同步删除目标文件？ (true/false)
     sync_source_dest: true
 
     # 是否自动清理目标目录中的空文件夹？ (true/false)
     cleanup_empty_dirs: true
+    
+    # 是否保留目标目录中多出来的元数据？
+    # true: 保留，不删除。 false: 不保留，删除。
+    preserve_extra_metadata: false
 
-    # 当源目录挂载丢失时，中止任务以防止误删 (true/false)
+    # 是否将目标目录的元数据同步回源目录？
+    # true: 是，将较新的元数据复制回去。 false: 否。
+    sync_metadata_to_source: false
+
+    # 当源目录挂载丢失时，是否中止任务以防止误删？ (true/false)
     stop_on_mount_loss: true
 
   monitor_confs:
     - 
       # 源目录列表 (视频/媒体文件所在位置)
-      source_dir: ["/mnt/media","/mnt/media2"]
+      source_dir: ["/mnt/media/国漫", "/mnt/media/日漫"]
 
       # 目标输出目录 (生成的.strm和元数据放这里)
       dest_dir: "/mnt/strm"
 
-      # .strm文件内指向的真实路径 (需与Emby/Plex等播放器访问路径一致)
+      # 计算相对路径的“根”，必须是所有source_dir的共同父目录
       library_dir: "/mnt/media"
 
       # 是否生成.strm文件？ (true/false)
-      create_strm: True
+      create_strm: true
       
       # 是否同步元数据文件(.nfo, .srt等)？ (true/false)
-      copy_metadata: True
+      copy_metadata: true
 
       # 需要生成strm的视频后缀
       video_extensions: [
