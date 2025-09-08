@@ -1,9 +1,9 @@
 sync:
   # 启动时，是否先执行一次全量任务？ (true/false)
-  run_full_task_on_startup: True
+  run_full_task_on_startup: true
 
   # 是否启用实时监控？ (true=文件变更时立即处理, false=仅靠定时任务)
-  real_time_monitor: True
+  real_time_monitor: true
 
   cron_full_process:
     # 是否启用定时任务？ (true/false)
@@ -18,16 +18,19 @@ sync:
     files_per_second_limit: 1
 
     # 定时任务是否扫描所有文件以确保完整性？ (true/false)
-    full_generate: True
+    full_generate: true
 
     # 是否覆盖已存在的目标文件？ (false=仅源文件更新时覆盖, true=总是覆盖)
-    overwrite_existing: False
+    overwrite_existing: talse
 
     # 源文件删除后，是否同步删除目标文件？ (true/false)
-    sync_source_dest: True
+    sync_source_dest: true
 
     # 是否自动清理目标目录中的空文件夹？ (true/false)
-    cleanup_empty_dirs: True
+    cleanup_empty_dirs: true
+
+    # 当源目录挂载丢失时，中止任务以防止误删 (true/false)
+    stop_on_mount_loss: true
 
   monitor_confs:
     - 
